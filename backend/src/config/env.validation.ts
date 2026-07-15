@@ -20,8 +20,9 @@ export function validateEnv(config: Record<string, string | undefined>) {
       throw new Error('JWT_SECRET must be at least 32 characters and must not use a default value in production');
     }
 
-    if (config.MONGODB_URI?.includes('localhost') || config.MONGODB_URI?.includes('127.0.0.1')) {
-      throw new Error('MONGODB_URI must point to a production database when NODE_ENV=production');
+    const usesLocalMongo = config.MONGODB_URI?.includes('localhost') || config.MONGODB_URI?.includes('127.0.0.1');
+    if (usesLocalMongo && config.ALLOW_LOCAL_MONGODB !== 'true') {
+      throw new Error('MONGODB_URI must point to a production database unless ALLOW_LOCAL_MONGODB=true is set');
     }
   }
 

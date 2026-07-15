@@ -7,7 +7,7 @@ Create production environment variables from `backend/.env.production.example`.
 Required in production:
 
 - `NODE_ENV=production`
-- `MONGODB_URI`: production MongoDB connection string. Do not use localhost.
+- `MONGODB_URI`: production MongoDB connection string.
 - `JWT_SECRET`: at least 32 random characters. Do not reuse example values.
 - `TELEGRAM_BOT_TOKEN`: real BotFather token.
 - `CLIENT_URL` or `CLIENT_URLS`: exact frontend origin(s), for example `https://app.example.uz`.
@@ -23,6 +23,7 @@ Recommended:
 - `LOG_DIR=/var/log/dinora-gullari`
 - `TELEGRAM_ERROR_ALERTS_ENABLED=true`
 - `TELEGRAM_ERROR_ALERT_THROTTLE_MS=300000`
+- `ALLOW_LOCAL_MONGODB=true` only for a single-server deployment where MongoDB is bound locally.
 
 Generate a strong JWT secret:
 
@@ -46,7 +47,7 @@ The backend now refuses to start in production when:
 
 - required variables are missing;
 - `JWT_SECRET` is too short or uses a default value;
-- `MONGODB_URI` points to localhost;
+- `MONGODB_URI` points to localhost unless `ALLOW_LOCAL_MONGODB=true` is explicitly set;
 - `COOKIE_SAME_SITE` has an invalid value.
 
 The backend also enables production API hardening: security headers, gzip compression, CORS origin allow-listing, JSON body limits, and per-IP rate limiting.
