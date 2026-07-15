@@ -25,9 +25,10 @@ export class AuthController {
   ) {}
 
   private cookieOptions() {
+    const cookieSecure = this.config.get<string>('COOKIE_SECURE');
     return {
       httpOnly: true,
-      secure: this.config.get<string>('NODE_ENV') === 'production',
+      secure: cookieSecure ? cookieSecure === 'true' : this.config.get<string>('NODE_ENV') === 'production',
       sameSite: (this.config.get<string>('COOKIE_SAME_SITE') || 'lax') as CookieSameSite,
       path: '/',
     };
