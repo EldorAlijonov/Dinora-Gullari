@@ -1,0 +1,28 @@
+services:
+  mongodb:
+    image: mongo:7
+    container_name: dinora-gullari-mongodb
+    restart: unless-stopped
+    volumes:
+      - mongodb_data:/data/db
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: dinora-gullari-backend
+    restart: unless-stopped
+    env_file:
+      - backend/.env.production
+    depends_on:
+      - mongodb
+    ports:
+      - "127.0.0.1:5000:5000"
+    volumes:
+      - backend_backups:/var/backups/dinora-gullari
+      - backend_logs:/var/log/dinora-gullari
+
+volumes:
+  mongodb_data:
+  backend_backups:
+  backend_logs:
