@@ -15,6 +15,7 @@ import { SettingsModule } from './modules/settings/settings.module';
 import { validateEnv } from './config/env.validation';
 import { BackupsModule } from './modules/backups/backups.module';
 import { MonitoringModule } from './modules/monitoring/monitoring.module';
+import { GoogleSheetsModule } from './modules/google-sheets/google-sheets.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { MonitoringModule } from './modules/monitoring/monitoring.module';
     TelegramModule,
     NotificationsModule,
     SettingsModule,
+    GoogleSheetsModule,
     BackupsModule,
     MonitoringModule,
   ],

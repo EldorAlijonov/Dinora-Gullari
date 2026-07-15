@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { FilterQuery, Model, Types } from 'mongoose';
+import { BulkDeleteDto } from '../../common/dto/bulk-delete.dto';
 import { escapeRegex } from '../../common/escape-regex';
 import { normalizePhone } from '../../common/phone';
 import { DeletedRecord, DeletedRecordDocument } from '../backups/schemas/deleted-record.schema';
@@ -202,16 +203,82 @@ export class OrdersService {
     const order = await this.orderModel.findById(id).exec();
     if (!order) throw new NotFoundException('Order not found');
 
-    await this.deletedRecordModel.create({
-      collection: 'orders',
-      recordId: id,
-      record: order.toObject(),
-      deletedBy: userId ? new Types.ObjectId(userId) : undefined,
-      deletedAt: new Date(),
-    });
+    await this.archiveOrder(order, userId);
     await order.deleteOne();
 
     return { deleted: true };
+  }
+
+  async bulkRemove(dto: BulkDeleteDto, userId?: string) {
+    const filter = this.bulkDeleteFilter(dto);
+    const orders = await this.orderModel.find(filter).exec();
+
+    for (const order of orders) {
+      await this.archiveOrder(order, userId);
+      await order.deleteOne();
+    }
+
+    return { deleted: orders.length };
+  }
+
+  private bulkDeleteFilter(dto: BulkDeleteDto): FilterQuery<OrderDocument> {
+    if (dto.scope === 'selected') {
+      const ids = (dto.ids || []).filter((id) => Types.ObjectId.isValid(id));
+      if (ids.length === 0) throw new BadRequestException('O\'chirish uchun yozuv tanlanmagan');
+      return { _id: { $in: ids.map((id) => new Types.ObjectId(id)) } };
+    }
+
+    const { start, end } = this.deleteDateRange(dto);
+    return { createdAt: { $gte: start, $lte: end } };
+  }
+
+  private deleteDateRange(dto: BulkDeleteDto) {
+    if (dto.scope === 'range') {
+      if (!dto.dateFrom || !dto.dateTo) throw new BadRequestException('Boshlanish va tugash sanalarini tanlang');
+      const start = new Date(dto.dateFrom);
+      const end = new Date(dto.dateTo);
+      if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) throw new BadRequestException('Sana noto\'g\'ri kiritilgan');
+      if (start > end) throw new BadRequestException('Boshlanish sanasi tugash sanasidan keyin bo\'lishi mumkin emas');
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+      return { start, end };
+    }
+
+    const anchor = dto.anchorDate ? new Date(dto.anchorDate) : new Date();
+    if (Number.isNaN(anchor.getTime())) throw new BadRequestException('Sana noto\'g\'ri kiritilgan');
+
+    const start = new Date(anchor);
+    const end = new Date(anchor);
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
+
+    if (dto.scope === 'week') {
+      const day = start.getDay() || 7;
+      start.setDate(start.getDate() - day + 1);
+      end.setTime(start.getTime());
+      end.setDate(start.getDate() + 6);
+      end.setHours(23, 59, 59, 999);
+    }
+
+    if (dto.scope === 'month') {
+      start.setDate(1);
+      end.setFullYear(start.getFullYear(), start.getMonth() + 1, 0);
+      end.setHours(23, 59, 59, 999);
+    }
+
+    return { start, end };
+  }
+
+  private async archiveOrder(order: OrderDocument, userId?: string) {
+    const deletedAt = new Date();
+    await this.deletedRecordModel.create({
+      collection: 'orders',
+      recordId: String(order._id),
+      record: order.toObject(),
+      deletedBy: userId ? new Types.ObjectId(userId) : undefined,
+      deletedAt,
+    });
+    void this.googleSheetsService.markOrderDeleted(order, deletedAt).catch(() => undefined);
   }
 
   private telegramDetails(order: OrderDocument) {

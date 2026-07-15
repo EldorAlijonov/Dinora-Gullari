@@ -7,7 +7,7 @@ import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { Textarea } from '../components/ui/Textarea';
 import { updateUser } from '../features/auth/authSlice';
-import apiClient, { useBackupFilesQuery, useChangePasswordMutation, useCreateBackupMutation, useDeletedRecordsQuery, useSettingsQuery, useUpdateMeMutation, useUpdateSettingsMutation } from '../services/api';
+import apiClient, { useBackupFilesQuery, useChangePasswordMutation, useCreateBackupMutation, useDeletedRecordsQuery, useSettingsQuery, useTestGoogleSheetsMutation, useUpdateMeMutation, useUpdateSettingsMutation } from '../services/api';
 import { getErrorMessage } from '../utils/errorMessage';
 
 const defaultSettings = {
@@ -84,11 +84,47 @@ function formatDateTime(value) {
   }).format(new Date(value));
 }
 
+function normalizeGooglePrivateKey(value) {
+  const trimmed = value.trim();
+  let keyValue = value;
+
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (typeof parsed === 'string') keyValue = parsed;
+    else if (parsed?.private_key) keyValue = parsed.private_key;
+  } catch {
+    const jsonFieldMatch = trimmed.match(/"private_key"\s*:\s*"((?:\\.|[^"\\])*)"/);
+    if (jsonFieldMatch?.[1]) {
+      try {
+        keyValue = JSON.parse(`"${jsonFieldMatch[1]}"`);
+      } catch {
+        keyValue = jsonFieldMatch[1];
+      }
+    } else {
+      const beginIndex = value.indexOf('-----BEGIN PRIVATE KEY-----');
+      const endMarker = '-----END PRIVATE KEY-----';
+      const endIndex = value.indexOf(endMarker);
+      if (beginIndex >= 0 && endIndex >= beginIndex) {
+        keyValue = value.slice(beginIndex, endIndex + endMarker.length);
+      }
+    }
+  }
+
+  return keyValue
+    .replace(/^\s*"|"\s*,?\s*$/g, '')
+    .replace(/\\r\\n/g, '\n')
+    .replace(/\\n/g, '\n')
+    .replace(/\\r/g, '\n')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n');
+}
+
 export default function SettingsPage() {
   const dispatch = useDispatch();
   const user = useSelector((state) => state.auth.user);
   const { data: settingsData, isLoading } = useSettingsQuery();
   const [updateSettings, settingsState] = useUpdateSettingsMutation();
+  const [testGoogleSheets, googleSheetsTestState] = useTestGoogleSheetsMutation();
   const [updateMe, profileState] = useUpdateMeMutation();
   const [changePassword, passwordState] = useChangePasswordMutation();
   const [createBackup, backupState] = useCreateBackupMutation();
@@ -133,8 +169,10 @@ export default function SettingsPage() {
         debtReminderAfterDays: Number(settings.debtReminderAfterDays || 0),
       }).unwrap();
       toast.success('Sozlamalar saqlandi');
+      return true;
     } catch (error) {
       toast.error(getErrorMessage(error, 'Sozlamalarni saqlashda xatolik'));
+      return false;
     }
   };
 
@@ -172,6 +210,17 @@ export default function SettingsPage() {
       toast.success('Backup yaratildi');
     } catch (error) {
       toast.error(getErrorMessage(error, 'Backup yaratishda xatolik'));
+    }
+  };
+
+  const handleTestGoogleSheets = async () => {
+    try {
+      const saved = await saveSettings();
+      if (!saved) return;
+      const result = await testGoogleSheets().unwrap();
+      toast.success(result.message || 'Google Sheets ulanishi ishlayapti');
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Google Sheets ulanishida xatolik'));
     }
   };
 
@@ -263,7 +312,12 @@ export default function SettingsPage() {
             <Input label="Necha kundan keyin" type="number" min="0" value={settings.debtReminderAfterDays} onChange={(event) => setSetting('debtReminderAfterDays', event.target.value)} />
             <Textarea label="Qarz eslatmasi matni" value={settings.debtReminderText} onChange={(event) => setSetting('debtReminderText', event.target.value)} />
           </div>
-          <Button loading={settingsState.isLoading} className="mt-4" onClick={saveSettings}><Save className="h-4 w-4" /> Saqlash</Button>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button loading={settingsState.isLoading} onClick={saveSettings}><Save className="h-4 w-4" /> Saqlash</Button>
+            <Button variant="secondary" loading={googleSheetsTestState.isLoading} onClick={handleTestGoogleSheets}>
+              <DatabaseBackup className="h-4 w-4" /> Ulanishni tekshirish
+            </Button>
+          </div>
         </Card>
 
         <Card>
@@ -291,7 +345,7 @@ export default function SettingsPage() {
               label="Service account private key"
               placeholder="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
               value={settings.googleSheetsPrivateKey}
-              onChange={(event) => setSetting('googleSheetsPrivateKey', event.target.value)}
+              onChange={(event) => setSetting('googleSheetsPrivateKey', normalizeGooglePrivateKey(event.target.value))}
             />
             <div className="grid gap-4 sm:grid-cols-2">
               <Input

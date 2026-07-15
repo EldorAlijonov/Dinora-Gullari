@@ -1,13 +1,17 @@
-import { CalendarDays, ChevronLeft, Gift, Search, ShoppingBag, X } from 'lucide-react';
+import { CalendarDays, ChevronLeft, Gift, Search, ShoppingBag, Trash2, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../components/layout/PageHeader';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { CopyableText } from '../components/ui/CopyableText';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Input } from '../components/ui/Input';
-import { useOrdersQuery, useSalesQuery } from '../services/api';
+import { Select } from '../components/ui/Select';
+import { useBulkDeleteOrdersMutation, useBulkDeleteSalesMutation, useOrdersQuery, useSalesQuery } from '../services/api';
+import { getErrorMessage } from '../utils/errorMessage';
 import { formatCurrency } from '../utils/formatCurrency';
 import { formatDate } from '../utils/formatDate';
 
@@ -16,6 +20,14 @@ const periodOptions = [
   ['week', 'Haftalik'],
   ['month', 'Oylik'],
   ['year', 'Yillik'],
+];
+
+const deleteScopeOptions = [
+  ['selected', 'Tanlangan yozuvlar'],
+  ['day', 'Bir kunlik'],
+  ['week', 'Bir haftalik'],
+  ['month', 'Bir oylik'],
+  ['range', 'Tanlangan davr'],
 ];
 
 function inputDate(date) {
@@ -48,9 +60,17 @@ function dateRange(period, anchorValue) {
 
 export default function ArchivePage() {
   const navigate = useNavigate();
+  const today = inputDate(new Date());
   const [period, setPeriod] = useState('day');
-  const [anchorDate, setAnchorDate] = useState(inputDate(new Date()));
+  const [anchorDate, setAnchorDate] = useState(today);
   const [search, setSearch] = useState('');
+  const [deleteScope, setDeleteScope] = useState('selected');
+  const [deleteDateFrom, setDeleteDateFrom] = useState(today);
+  const [deleteDateTo, setDeleteDateTo] = useState(today);
+  const [selectedRows, setSelectedRows] = useState(() => new Set());
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [bulkDeleteOrders, orderDeleteState] = useBulkDeleteOrdersMutation();
+  const [bulkDeleteSales, saleDeleteState] = useBulkDeleteSalesMutation();
   const range = useMemo(() => dateRange(period, anchorDate), [period, anchorDate]);
   const params = useMemo(() => ({ ...range, search: search || undefined }), [range, search]);
   const orders = useOrdersQuery(params);
@@ -61,6 +81,79 @@ export default function ArchivePage() {
   const items = [...orderItems, ...saleItems].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   const totalAmount = items.reduce((sum, row) => sum + (row.type === 'order' ? row.item.totalAmount : row.item.amount), 0);
   const totalDebt = items.reduce((sum, row) => sum + (row.item.debtAmount || 0), 0);
+  const selectedOrderIds = [...selectedRows].filter((key) => key.startsWith('order:')).map((key) => key.slice('order:'.length));
+  const selectedSaleIds = [...selectedRows].filter((key) => key.startsWith('sale:')).map((key) => key.slice('sale:'.length));
+  const allVisibleSelected = items.length > 0 && items.every((row) => selectedRows.has(rowKey(row)));
+  const deleteLoading = orderDeleteState.isLoading || saleDeleteState.isLoading;
+  const deleteLabel = deleteScopeOptions.find(([value]) => value === deleteScope)?.[1] || '';
+
+  const toggleRow = (key) => {
+    setSelectedRows((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const toggleAllVisible = () => {
+    setSelectedRows((current) => {
+      const next = new Set(current);
+      if (allVisibleSelected) {
+        items.forEach((row) => next.delete(rowKey(row)));
+      } else {
+        items.forEach((row) => next.add(rowKey(row)));
+      }
+      return next;
+    });
+  };
+
+  const confirmDescription = deleteScope === 'selected'
+    ? `${selectedRows.size} ta tanlangan yozuv o'chiriladi. Google Sheetsdagi qatorlar o'chmaydi, statusi "O'chirildi" bo'ladi.`
+    : deleteScope === 'range'
+      ? `Tanlangan davr (${deleteDateFrom} - ${deleteDateTo}) yozuvlari o'chiriladi. Google Sheetsdagi qatorlar o'chmaydi, statusi "O'chirildi" bo'ladi.`
+    : `${deleteLabel} (${dateRange(deleteScope, anchorDate).dateFrom} - ${dateRange(deleteScope, anchorDate).dateTo}) yozuvlari o'chiriladi. Google Sheetsdagi qatorlar o'chmaydi, statusi "O'chirildi" bo'ladi.`;
+
+  const handleBulkDelete = async () => {
+    if (deleteScope === 'selected' && selectedRows.size === 0) {
+      toast.error('O\'chirish uchun kamida bitta yozuv tanlang');
+      return;
+    }
+    if (deleteScope === 'range' && (!deleteDateFrom || !deleteDateTo)) {
+      toast.error('Boshlanish va tugash sanalarini tanlang');
+      return;
+    }
+    if (deleteScope === 'range' && new Date(deleteDateFrom) > new Date(deleteDateTo)) {
+      toast.error('Boshlanish sanasi tugash sanasidan keyin bo\'lishi mumkin emas');
+      return;
+    }
+    setConfirmOpen(true);
+  };
+
+  const executeBulkDelete = async () => {
+    const body = deleteScope === 'selected'
+      ? { scope: 'selected' }
+      : deleteScope === 'range'
+        ? { scope: 'range', dateFrom: deleteDateFrom, dateTo: deleteDateTo }
+      : { scope: deleteScope, anchorDate };
+
+    try {
+      const [ordersResult, salesResult] = await Promise.all([
+        deleteScope === 'selected' && selectedOrderIds.length === 0
+          ? Promise.resolve({ deleted: 0 })
+          : bulkDeleteOrders(deleteScope === 'selected' ? { ...body, ids: selectedOrderIds } : body).unwrap(),
+        deleteScope === 'selected' && selectedSaleIds.length === 0
+          ? Promise.resolve({ deleted: 0 })
+          : bulkDeleteSales(deleteScope === 'selected' ? { ...body, ids: selectedSaleIds } : body).unwrap(),
+      ]);
+      const deleted = (ordersResult.deleted || 0) + (salesResult.deleted || 0);
+      setSelectedRows(new Set());
+      setConfirmOpen(false);
+      toast.success(`${deleted} ta yozuv o'chirildi`);
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Yozuvlarni o\'chirishda xatolik'));
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -111,6 +204,31 @@ export default function ArchivePage() {
         </div>
       </Card>
 
+      <Card>
+        <div className="grid gap-3 lg:grid-cols-[260px_1fr_auto] lg:items-end">
+          <Select label="O'chirish turi" value={deleteScope} onChange={(event) => setDeleteScope(event.target.value)}>
+            {deleteScopeOptions.map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </Select>
+          {deleteScope === 'range' ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Input label="Boshlanish sanasi" type="date" value={deleteDateFrom} onChange={(event) => setDeleteDateFrom(event.target.value)} />
+              <Input label="Tugash sanasi" type="date" value={deleteDateTo} onChange={(event) => setDeleteDateTo(event.target.value)} />
+            </div>
+          ) : (
+            <p className="text-sm leading-6 text-slate-400">
+              {deleteScope === 'selected'
+                ? `Tanlangan: ${selectedRows.size} ta. Jadvaldan kerakli yozuvlarni belgilang.`
+                : `${deleteLabel} o'chirish joriy tanlangan sana asosida ishlaydi: ${dateRange(deleteScope, anchorDate).dateFrom} - ${dateRange(deleteScope, anchorDate).dateTo}.`}
+            </p>
+          )}
+          <Button variant="danger" loading={deleteLoading} onClick={handleBulkDelete}>
+            <Trash2 className="h-4 w-4" /> O'chirish
+          </Button>
+        </div>
+      </Card>
+
       <Card className="overflow-x-auto">
         {orders.isLoading || sales.isLoading ? (
           <div className="p-8 text-center text-slate-400">Yuklanmoqda...</div>
@@ -120,6 +238,15 @@ export default function ArchivePage() {
           <table className="w-full min-w-[1060px] text-left text-sm">
             <thead className="text-xs uppercase text-slate-500">
               <tr>
+                <th className="w-11 px-3 py-3">
+                  <input
+                    type="checkbox"
+                    checked={allVisibleSelected}
+                    onChange={toggleAllVisible}
+                    className="h-4 w-4 accent-rose-400"
+                    aria-label="Barcha ko'rinayotgan yozuvlarni tanlash"
+                  />
+                </th>
                 {['#', 'Turi', 'Sana', 'Mijoz', 'Telefon', 'Nomi', 'Umumiy', 'Qarz', 'Status'].map((heading) => (
                   <th key={heading} className="px-3 py-3">{heading}</th>
                 ))}
@@ -127,17 +254,28 @@ export default function ArchivePage() {
             </thead>
             <tbody className="divide-y divide-white/10">
               {items.map((row, index) => (
-                <ArchiveRow key={`${row.type}-${row.item._id}`} row={row} index={index} />
+                <ArchiveRow key={rowKey(row)} row={row} index={index} selected={selectedRows.has(rowKey(row))} onToggle={() => toggleRow(rowKey(row))} />
               ))}
             </tbody>
           </table>
         )}
       </Card>
+
+      <ConfirmModal
+        open={confirmOpen}
+        title="Yozuvlarni o'chirish"
+        description={confirmDescription}
+        confirmText="O'chirish"
+        variant="danger"
+        loading={deleteLoading}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={executeBulkDelete}
+      />
     </div>
   );
 }
 
-function ArchiveRow({ row, index }) {
+function ArchiveRow({ row, index, selected, onToggle }) {
   const item = row.item;
   const isOrder = row.type === 'order';
   const name = isOrder ? item.customerName : item.customerName || '-';
@@ -148,6 +286,15 @@ function ArchiveRow({ row, index }) {
 
   return (
     <tr className="transition hover:bg-white/5">
+      <td className="px-3 py-3">
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={onToggle}
+          className="h-4 w-4 accent-rose-400"
+          aria-label="Yozuvni tanlash"
+        />
+      </td>
       <td className="px-3 py-3 font-bold text-slate-500">{index + 1}</td>
       <td className="px-3 py-3">
         <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-xs font-bold ${isOrder ? 'border-rose-300/20 bg-rose-400/10 text-rose-100' : 'border-sky-300/20 bg-sky-400/10 text-sky-100'}`}>
@@ -170,6 +317,10 @@ function ArchiveRow({ row, index }) {
       <td className="px-3 py-3 text-slate-300">{status}</td>
     </tr>
   );
+}
+
+function rowKey(row) {
+  return `${row.type}:${row.item._id}`;
 }
 
 function Summary({ label, value, danger }) {

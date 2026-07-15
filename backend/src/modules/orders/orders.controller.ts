@@ -1,5 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { BulkDeleteDto } from '../../common/dto/bulk-delete.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { ParseObjectIdPipe } from '../../common/pipes/parse-object-id.pipe';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -47,6 +48,11 @@ export class OrdersController {
   @Post(':id/send-debt-reminder')
   sendDebtReminder(@Param('id', ParseObjectIdPipe) id: string) {
     return this.ordersService.sendDebtReminder(id);
+  }
+
+  @Delete('bulk')
+  bulkRemove(@Body() dto: BulkDeleteDto, @CurrentUser() user: { userId: string }) {
+    return this.ordersService.bulkRemove(dto, user.userId);
   }
 
   @Delete(':id')

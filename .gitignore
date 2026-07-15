@@ -7,5 +7,6 @@ dist/
 !.env.production.example
 
 *.log
+*.tsbuildinfo
 backups/
 backend/backups/

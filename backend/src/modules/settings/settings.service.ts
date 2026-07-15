@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { normalizeGooglePrivateKey } from '../../common/google-private-key';
 import { sanitizeImageUrl } from '../../common/image-url';
 import { AppSettings, SettingsDocument } from './schemas/settings.schema';
 
@@ -36,7 +37,7 @@ export class SettingsService {
       googleSheetsEnabled: body.googleSheetsEnabled,
       googleSheetsSpreadsheetId: body.googleSheetsSpreadsheetId,
       googleSheetsServiceAccountEmail: body.googleSheetsServiceAccountEmail,
-      googleSheetsPrivateKey: body.googleSheetsPrivateKey,
+      googleSheetsPrivateKey: body.googleSheetsPrivateKey === undefined ? undefined : normalizeGooglePrivateKey(body.googleSheetsPrivateKey),
       googleSheetsOrdersSheet: body.googleSheetsOrdersSheet,
       googleSheetsSalesSheet: body.googleSheetsSalesSheet,
     };
