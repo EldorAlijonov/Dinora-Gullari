@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { DeletedRecord, DeletedRecordSchema } from '../backups/schemas/deleted-record.schema';
+import { GoogleSheetsModule } from '../google-sheets/google-sheets.module';
 import { TelegramModule } from '../telegram/telegram.module';
 import { SettingsModule } from '../settings/settings.module';
 import { Sale, SaleSchema } from './schemas/sale.schema';
@@ -13,6 +14,7 @@ import { SalesService } from './sales.service';
       { name: Sale.name, schema: SaleSchema },
       { name: DeletedRecord.name, schema: DeletedRecordSchema },
     ]),
+    GoogleSheetsModule,
     TelegramModule,
     SettingsModule,
   ],

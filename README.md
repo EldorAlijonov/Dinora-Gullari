@@ -107,6 +107,7 @@ Backend includes:
 - global exception filter with request IDs;
 - backend error logs and optional Telegram admin alerts;
 - JSON backup/export and deleted-record archive.
+- optional non-blocking Google Sheets mirror sync for newly created orders and sales.
 
 Frontend includes:
 
@@ -131,3 +132,5 @@ Frontend includes:
 ## Notes
 
 Profile and store images are currently stored as compressed inline image data. This is acceptable for a small internal CRM, but a larger deployment should move images to object storage or a dedicated upload service.
+
+Google Sheets sync is optional. Enable it with `GOOGLE_SHEETS_ENABLED=true`, configure the service account variables, and share the spreadsheet with the service account email.

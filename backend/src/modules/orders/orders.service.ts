@@ -4,6 +4,7 @@ import { FilterQuery, Model, Types } from 'mongoose';
 import { escapeRegex } from '../../common/escape-regex';
 import { normalizePhone } from '../../common/phone';
 import { DeletedRecord, DeletedRecordDocument } from '../backups/schemas/deleted-record.schema';
+import { GoogleSheetsService } from '../google-sheets/google-sheets.service';
 import { TelegramService } from '../telegram/telegram.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { PayOrderDebtDto } from './dto/pay-order-debt.dto';
@@ -16,6 +17,7 @@ export class OrdersService {
     @InjectModel(Order.name) private readonly orderModel: Model<OrderDocument>,
     @InjectModel(DeletedRecord.name) private readonly deletedRecordModel: Model<DeletedRecordDocument>,
     private readonly telegramService: TelegramService,
+    private readonly googleSheetsService: GoogleSheetsService,
   ) {}
 
   async findAll(query: { status?: OrderStatus; search?: string; date?: string; dateFrom?: string; dateTo?: string; page?: string; limit?: string; filter?: 'today' | 'pickup_today' | 'upcoming' | 'debt' | 'overdue' }) {
@@ -117,6 +119,7 @@ export class OrdersService {
       .sendOrderAccepted(order.telegramPhone || order.phone, this.telegramDetails(order))
       .catch(() => undefined);
     void this.telegramService.notifyAdminsNewOrder(order).catch(() => undefined);
+    void this.googleSheetsService.appendOrderCreated(order).catch(() => undefined);
     return order;
   }
 

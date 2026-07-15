@@ -4,6 +4,7 @@ import { FilterQuery, Model, Types } from 'mongoose';
 import { escapeRegex } from '../../common/escape-regex';
 import { normalizePhone } from '../../common/phone';
 import { DeletedRecord, DeletedRecordDocument } from '../backups/schemas/deleted-record.schema';
+import { GoogleSheetsService } from '../google-sheets/google-sheets.service';
 import { SettingsService } from '../settings/settings.service';
 import { TelegramService } from '../telegram/telegram.service';
 import { CreateSaleDto } from './dto/create-sale.dto';
@@ -18,6 +19,7 @@ export class SalesService {
     @InjectModel(DeletedRecord.name) private readonly deletedRecordModel: Model<DeletedRecordDocument>,
     private readonly telegramService: TelegramService,
     private readonly settingsService: SettingsService,
+    private readonly googleSheetsService: GoogleSheetsService,
   ) {}
 
   async findAll(query: { paymentType?: PaymentType; date?: string; dateFrom?: string; dateTo?: string; search?: string; page?: string; limit?: string }) {
@@ -92,6 +94,7 @@ export class SalesService {
 
     void this.telegramService.sendSaleCreated(sale.telegramPhone || sale.phone, this.telegramDetails(sale)).catch(() => undefined);
     void this.telegramService.notifyAdminsNewSale(sale).catch(() => undefined);
+    void this.googleSheetsService.appendSaleCreated(sale).catch(() => undefined);
     return sale;
   }
 

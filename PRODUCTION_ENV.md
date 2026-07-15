@@ -26,6 +26,12 @@ Recommended:
 - `LOG_DIR=/var/log/dinora-gullari`
 - `TELEGRAM_ERROR_ALERTS_ENABLED=true`
 - `TELEGRAM_ERROR_ALERT_THROTTLE_MS=300000`
+- `GOOGLE_SHEETS_ENABLED=true` when you want order/sale rows mirrored to Google Sheets.
+- `GOOGLE_SHEETS_SPREADSHEET_ID`
+- `GOOGLE_SERVICE_ACCOUNT_EMAIL`
+- `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY`
+- `GOOGLE_SHEETS_ORDERS_SHEET=Orders`
+- `GOOGLE_SHEETS_SALES_SHEET=Sales`
 
 Generate a strong JWT secret:
 
@@ -88,3 +94,20 @@ Frontend behavior:
 - API 400/403/404/500/network errors are converted into understandable user messages;
 - 500 errors show the backend `requestId` when available;
 - runtime UI crashes show a recovery screen with a reload button instead of a blank page.
+
+## Google Sheets mirror sync
+
+Google Sheets sync is optional and non-blocking. MongoDB remains the source of truth.
+
+When enabled, newly created flower orders and gift/product sales are appended to Google Sheets. If Google Sheets is unavailable, the backend logs a warning and the CRM operation still succeeds.
+
+Setup:
+
+1. Create a Google Cloud service account.
+2. Enable the Google Sheets API for the project.
+3. Create a private key for the service account.
+4. Create or open the target spreadsheet.
+5. Share the spreadsheet with `GOOGLE_SERVICE_ACCOUNT_EMAIL` as Editor.
+6. Put the spreadsheet ID and service account credentials into the backend environment.
+
+The private key must be stored as a secret and must not be committed to Git.
