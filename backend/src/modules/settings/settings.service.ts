@@ -33,6 +33,12 @@ export class SettingsService {
       debtReminderAfterDays: body.debtReminderAfterDays,
       preventSameDayDebtReminder: body.preventSameDayDebtReminder,
       debtReminderText: body.debtReminderText,
+      googleSheetsEnabled: body.googleSheetsEnabled,
+      googleSheetsSpreadsheetId: body.googleSheetsSpreadsheetId,
+      googleSheetsServiceAccountEmail: body.googleSheetsServiceAccountEmail,
+      googleSheetsPrivateKey: body.googleSheetsPrivateKey,
+      googleSheetsOrdersSheet: body.googleSheetsOrdersSheet,
+      googleSheetsSalesSheet: body.googleSheetsSalesSheet,
     };
 
     Object.keys(allowed).forEach((key) => {

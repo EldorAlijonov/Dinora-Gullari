@@ -25,6 +25,12 @@ const defaultSettings = {
   debtReminderAfterDays: 3,
   preventSameDayDebtReminder: true,
   debtReminderText: 'Qarzdorlik bo‘yicha eslatma.',
+  googleSheetsEnabled: false,
+  googleSheetsSpreadsheetId: '',
+  googleSheetsServiceAccountEmail: '',
+  googleSheetsPrivateKey: '',
+  googleSheetsOrdersSheet: 'Orders',
+  googleSheetsSalesSheet: 'Sales',
 };
 
 function loadImage(src) {
@@ -256,6 +262,49 @@ export default function SettingsPage() {
           <div className="mt-4 grid gap-4 sm:grid-cols-[160px_1fr]">
             <Input label="Necha kundan keyin" type="number" min="0" value={settings.debtReminderAfterDays} onChange={(event) => setSetting('debtReminderAfterDays', event.target.value)} />
             <Textarea label="Qarz eslatmasi matni" value={settings.debtReminderText} onChange={(event) => setSetting('debtReminderText', event.target.value)} />
+          </div>
+          <Button loading={settingsState.isLoading} className="mt-4" onClick={saveSettings}><Save className="h-4 w-4" /> Saqlash</Button>
+        </Card>
+
+        <Card>
+          <h2 className="mb-4 text-lg font-bold text-slate-100">Google Sheets zaxira nusxa</h2>
+          <div className="space-y-4">
+            <Toggle
+              label="Google Sheetsga avtomatik yozish"
+              description="Buyurtma yoki sovg'a/tovar sotuv yaratilganda Google Sheetsga ham alohida qator qo'shiladi."
+              checked={settings.googleSheetsEnabled}
+              onChange={(value) => setSetting('googleSheetsEnabled', value)}
+            />
+            <Input
+              label="Spreadsheet ID"
+              placeholder="1AbC..."
+              value={settings.googleSheetsSpreadsheetId}
+              onChange={(event) => setSetting('googleSheetsSpreadsheetId', event.target.value)}
+            />
+            <Input
+              label="Service account email"
+              placeholder="service-account@project.iam.gserviceaccount.com"
+              value={settings.googleSheetsServiceAccountEmail}
+              onChange={(event) => setSetting('googleSheetsServiceAccountEmail', event.target.value)}
+            />
+            <Textarea
+              label="Service account private key"
+              placeholder="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
+              value={settings.googleSheetsPrivateKey}
+              onChange={(event) => setSetting('googleSheetsPrivateKey', event.target.value)}
+            />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Input
+                label="Buyurtmalar sheet nomi"
+                value={settings.googleSheetsOrdersSheet}
+                onChange={(event) => setSetting('googleSheetsOrdersSheet', event.target.value)}
+              />
+              <Input
+                label="Sotuvlar sheet nomi"
+                value={settings.googleSheetsSalesSheet}
+                onChange={(event) => setSetting('googleSheetsSalesSheet', event.target.value)}
+              />
+            </div>
           </div>
           <Button loading={settingsState.isLoading} className="mt-4" onClick={saveSettings}><Save className="h-4 w-4" /> Saqlash</Button>
         </Card>

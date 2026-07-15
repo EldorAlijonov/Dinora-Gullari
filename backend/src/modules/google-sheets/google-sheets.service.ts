@@ -1,8 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { google, sheets_v4 } from 'googleapis';
 import { OrderDocument } from '../orders/schemas/order.schema';
 import { SaleDocument } from '../sales/schemas/sale.schema';
+import { AppSettings } from '../settings/schemas/settings.schema';
+import { SettingsService } from '../settings/settings.service';
 
 const orderHeaders = [
   'Synced at',
@@ -45,15 +46,12 @@ export class GoogleSheetsService {
   private readonly logger = new Logger(GoogleSheetsService.name);
   private readonly initializedSheets = new Set<string>();
   private sheetsClient?: sheets_v4.Sheets;
+  private clientCredentialsKey = '';
 
-  constructor(private readonly config: ConfigService) {}
-
-  get enabled() {
-    return this.config.get<string>('GOOGLE_SHEETS_ENABLED') === 'true';
-  }
+  constructor(private readonly settingsService: SettingsService) {}
 
   async appendOrderCreated(order: OrderDocument) {
-    await this.appendRow(this.orderSheetName(), orderHeaders, [
+    await this.appendRow('orders', orderHeaders, [
       new Date().toISOString(),
       this.dateValue(this.createdAt(order)),
       String(order._id),
@@ -73,7 +71,7 @@ export class GoogleSheetsService {
   }
 
   async appendSaleCreated(sale: SaleDocument) {
-    await this.appendRow(this.salesSheetName(), saleHeaders, [
+    await this.appendRow('sales', saleHeaders, [
       new Date().toISOString(),
       this.dateValue(this.createdAt(sale)),
       String(sale._id),
@@ -92,17 +90,20 @@ export class GoogleSheetsService {
     ]);
   }
 
-  private async appendRow(sheetName: string, headers: string[], row: Array<string | number>) {
-    if (!this.enabled) return;
+  private async appendRow(kind: 'orders' | 'sales', headers: string[], row: Array<string | number>) {
+    const settings = await this.settingsService.getSettings();
+    if (!settings?.googleSheetsEnabled) return;
 
-    const spreadsheetId = this.config.get<string>('GOOGLE_SHEETS_SPREADSHEET_ID');
+    const spreadsheetId = settings.googleSheetsSpreadsheetId?.trim();
     if (!spreadsheetId) {
-      this.logger.warn('Google Sheets sync is enabled but GOOGLE_SHEETS_SPREADSHEET_ID is missing');
+      this.logger.warn('Google Sheets sync is enabled but spreadsheet ID is missing');
       return;
     }
 
+    const sheetName = kind === 'orders' ? settings.googleSheetsOrdersSheet || 'Orders' : settings.googleSheetsSalesSheet || 'Sales';
+
     try {
-      const sheets = await this.client();
+      const sheets = await this.client(settings);
       await this.ensureHeader(sheets, spreadsheetId, sheetName, headers);
       await sheets.spreadsheets.values.append({
         spreadsheetId,
@@ -136,11 +137,12 @@ export class GoogleSheetsService {
     this.initializedSheets.add(key);
   }
 
-  private async client() {
-    if (this.sheetsClient) return this.sheetsClient;
+  private async client(settings: AppSettings) {
+    const clientEmail = settings.googleSheetsServiceAccountEmail?.trim();
+    const privateKey = settings.googleSheetsPrivateKey?.replace(/\\n/g, '\n').trim();
+    const credentialsKey = `${clientEmail}:${privateKey}`;
 
-    const clientEmail = this.config.get<string>('GOOGLE_SERVICE_ACCOUNT_EMAIL');
-    const privateKey = this.config.get<string>('GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY')?.replace(/\\n/g, '\n');
+    if (this.sheetsClient && this.clientCredentialsKey === credentialsKey) return this.sheetsClient;
 
     if (!clientEmail || !privateKey) {
       throw new Error('Google service account credentials are missing');
@@ -153,15 +155,8 @@ export class GoogleSheetsService {
     });
 
     this.sheetsClient = google.sheets({ version: 'v4', auth });
+    this.clientCredentialsKey = credentialsKey;
     return this.sheetsClient;
-  }
-
-  private orderSheetName() {
-    return this.config.get<string>('GOOGLE_SHEETS_ORDERS_SHEET') || 'Orders';
-  }
-
-  private salesSheetName() {
-    return this.config.get<string>('GOOGLE_SHEETS_SALES_SHEET') || 'Sales';
   }
 
   private quoteSheetName(name: string) {

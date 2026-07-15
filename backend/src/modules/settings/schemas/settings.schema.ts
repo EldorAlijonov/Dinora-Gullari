@@ -49,6 +49,24 @@ export class AppSettings {
 
   @Prop({ type: String, default: 'Qarzdorlik bo‘yicha eslatma.' })
   debtReminderText: string;
+
+  @Prop({ type: Boolean, default: false })
+  googleSheetsEnabled: boolean;
+
+  @Prop({ type: String, default: '', trim: true })
+  googleSheetsSpreadsheetId: string;
+
+  @Prop({ type: String, default: '', trim: true })
+  googleSheetsServiceAccountEmail: string;
+
+  @Prop({ type: String, default: '' })
+  googleSheetsPrivateKey: string;
+
+  @Prop({ type: String, default: 'Orders', trim: true })
+  googleSheetsOrdersSheet: string;
+
+  @Prop({ type: String, default: 'Sales', trim: true })
+  googleSheetsSalesSheet: string;
 }
 
 export const SettingsSchema = SchemaFactory.createForClass(AppSettings);

@@ -18,20 +18,11 @@ Recommended:
 - `TELEGRAM_ADMIN_IDS=6874906701,1779520880`
 - `COOKIE_SAME_SITE=none` when frontend and backend are on different HTTPS domains.
 - `COOKIE_SAME_SITE=lax` when frontend and backend are same-site.
-- `REQUEST_BODY_LIMIT=10mb` for compressed profile/store images.
-- `RATE_LIMIT_WINDOW_MS=60000`
-- `RATE_LIMIT_MAX=180`
 - `BACKUP_ENABLED=true`
 - `BACKUP_DIR=/var/backups/dinora-gullari` or another persistent server directory.
 - `LOG_DIR=/var/log/dinora-gullari`
 - `TELEGRAM_ERROR_ALERTS_ENABLED=true`
 - `TELEGRAM_ERROR_ALERT_THROTTLE_MS=300000`
-- `GOOGLE_SHEETS_ENABLED=true` when you want order/sale rows mirrored to Google Sheets.
-- `GOOGLE_SHEETS_SPREADSHEET_ID`
-- `GOOGLE_SERVICE_ACCOUNT_EMAIL`
-- `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY`
-- `GOOGLE_SHEETS_ORDERS_SHEET=Orders`
-- `GOOGLE_SHEETS_SALES_SHEET=Sales`
 
 Generate a strong JWT secret:
 
@@ -107,7 +98,8 @@ Setup:
 2. Enable the Google Sheets API for the project.
 3. Create a private key for the service account.
 4. Create or open the target spreadsheet.
-5. Share the spreadsheet with `GOOGLE_SERVICE_ACCOUNT_EMAIL` as Editor.
-6. Put the spreadsheet ID and service account credentials into the backend environment.
+5. In the CRM admin panel, open Settings and enable Google Sheets sync.
+6. Fill Spreadsheet ID, service account email, private key, and sheet names.
+7. Share the spreadsheet with the service account email as Editor.
 
-The private key must be stored as a secret and must not be committed to Git.
+The private key is stored in the app settings database for admin convenience. Keep database access restricted and never commit the key to Git.

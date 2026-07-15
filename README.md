@@ -133,4 +133,4 @@ Frontend includes:
 
 Profile and store images are currently stored as compressed inline image data. This is acceptable for a small internal CRM, but a larger deployment should move images to object storage or a dedicated upload service.
 
-Google Sheets sync is optional. Enable it with `GOOGLE_SHEETS_ENABLED=true`, configure the service account variables, and share the spreadsheet with the service account email.
+Google Sheets sync is optional. Configure it from the admin Settings page, then share the spreadsheet with the service account email.
