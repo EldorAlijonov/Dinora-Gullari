@@ -19,6 +19,7 @@ function parseOrigins(value?: string) {
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
+  app.getHttpAdapter().getInstance().set('trust proxy', Number(config.get<string>('TRUST_PROXY') || 1));
   const bodyLimit = config.get<string>('REQUEST_BODY_LIMIT') || '10mb';
   const allowedOrigins = parseOrigins(config.get<string>('CLIENT_URLS') || config.get<string>('CLIENT_URL') || 'http://localhost:5173');
 

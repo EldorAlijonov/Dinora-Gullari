@@ -19,6 +19,7 @@ Recommended:
 - `COOKIE_SAME_SITE=none` when frontend and backend are on different HTTPS domains.
 - `COOKIE_SAME_SITE=lax` when frontend and backend are same-site.
 - `COOKIE_SECURE=false` only when serving production over plain HTTP.
+- `TRUST_PROXY=1` when the backend runs behind nginx or another reverse proxy.
 - `BACKUP_ENABLED=true`
 - `BACKUP_DIR=/var/backups/dinora-gullari` or another persistent server directory.
 - `LOG_DIR=/var/log/dinora-gullari`
