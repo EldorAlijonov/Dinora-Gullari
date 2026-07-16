@@ -22,8 +22,14 @@ async function bootstrap() {
   app.getHttpAdapter().getInstance().set('trust proxy', Number(config.get<string>('TRUST_PROXY') || 1));
   const bodyLimit = config.get<string>('REQUEST_BODY_LIMIT') || '10mb';
   const allowedOrigins = parseOrigins(config.get<string>('CLIENT_URLS') || config.get<string>('CLIENT_URL') || 'http://localhost:5173');
+  const isHttps = config.get<string>('COOKIE_SECURE') !== 'false';
 
-  app.use(helmet());
+  app.use(
+    helmet({
+      contentSecurityPolicy: isHttps ? undefined : { directives: { upgradeInsecureRequests: null } },
+      hsts: isHttps ? undefined : false,
+    }),
+  );
   app.use(compression());
   app.use(json({ limit: bodyLimit }));
   app.use(urlencoded({ extended: true, limit: bodyLimit }));

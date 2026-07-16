@@ -14,6 +14,7 @@ function resolveBaseUrl() {
     throw new Error('VITE_API_URL must point to the production backend in production builds');
   }
 
+  if (configuredUrl?.startsWith('/')) return configuredUrl.replace(/\/+$/, '');
   return (configuredUrl || 'http://localhost:5000').replace(/\/+$/, '');
 }
 
