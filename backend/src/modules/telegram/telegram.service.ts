@@ -512,7 +512,68 @@ export class TelegramService implements OnModuleInit {
     );
   }
 
-  private async sendAdminMenu(chatId: number) {
+  private adminMainKeyboard() {
+    return {
+      inline_keyboard: [
+        [
+          { text: 'Hisobot', callback_data: 'admin:report' },
+          { text: 'Buyurtmalar', callback_data: 'admin:orders' },
+        ],
+        [
+          { text: 'Qarzlar', callback_data: 'admin:debts' },
+          { text: 'Ogohlantirishlar', callback_data: 'admin:alerts' },
+        ],
+        [
+          { text: 'Qidirish', callback_data: 'admin:search' },
+          { text: 'Sozlamalar', callback_data: 'admin:settings' },
+        ],
+        [{ text: 'Texnik holat', callback_data: 'admin:health' }],
+      ],
+    };
+  }
+
+  private adminOrdersKeyboard() {
+    return {
+      inline_keyboard: [
+        [
+          { text: 'Bugungi buyurtmalar', callback_data: 'admin:orders:today' },
+          { text: 'Kechikkanlar', callback_data: 'admin:orders:overdue' },
+        ],
+        [{ text: 'Orqaga', callback_data: 'admin:menu' }],
+      ],
+    };
+  }
+
+  private adminDebtsKeyboard() {
+    return {
+      inline_keyboard: [[{ text: 'Qarzdorlar ro\'yxati', callback_data: 'admin:debts:list' }], [{ text: 'Orqaga', callback_data: 'admin:menu' }]],
+    };
+  }
+
+  private adminSettingsKeyboard() {
+    return {
+      inline_keyboard: [
+        [
+          { text: 'Adminlar', callback_data: 'admin:settings:admins' },
+          { text: 'Bot holati', callback_data: 'admin:health' },
+        ],
+        [{ text: 'Orqaga', callback_data: 'admin:menu' }],
+      ],
+    };
+  }
+
+  private adminReplyKeyboard() {
+    return {
+      keyboard: [
+        [{ text: '/admin' }, { text: '/hisobot' }],
+        [{ text: '/bugun' }, { text: '/qarzlar' }],
+        [{ text: '/kechikkan' }, { text: '/holat' }],
+      ],
+      resize_keyboard: true,
+    };
+  }
+
+  private async sendAdminMenuLegacy(chatId: number) {
     await this.bot?.sendMessage(
       chatId,
       [
@@ -540,6 +601,15 @@ export class TelegramService implements OnModuleInit {
         },
       },
     );
+  }
+
+  private async sendAdminMenu(chatId: number) {
+    await this.bot?.sendMessage(
+      chatId,
+      ['Admin panel', '', 'Kerakli bo\'limni tanlang. Ichki tugmalar navigatsiya uchun, pastdagi panel esa tezkor komandalar uchun.'].join('\n'),
+      { reply_markup: this.adminMainKeyboard() },
+    );
+    await this.bot?.sendMessage(chatId, 'Tezkor panel', { reply_markup: this.adminReplyKeyboard() });
   }
 
   private registerHandlers() {
@@ -619,6 +689,78 @@ export class TelegramService implements OnModuleInit {
 
       const [type, idOrSource, value] = query.data.split(':');
       try {
+        if (type === 'admin') {
+          await this.bot?.answerCallbackQuery(query.id);
+
+          if (idOrSource === 'menu') {
+            await this.sendAdminMenu(chatId);
+            return;
+          }
+
+          if (idOrSource === 'report') {
+            await this.sendAdminReport(chatId);
+            return;
+          }
+
+          if (idOrSource === 'orders') {
+            if (value === 'today') {
+              await this.sendAdminOrders(chatId, 'today');
+              return;
+            }
+            if (value === 'overdue') {
+              await this.sendAdminOrders(chatId, 'overdue');
+              return;
+            }
+            await this.bot?.sendMessage(chatId, 'Buyurtmalar bo\'limi', { reply_markup: this.adminOrdersKeyboard() });
+            return;
+          }
+
+          if (idOrSource === 'debts') {
+            if (value === 'list') {
+              await this.sendAdminDebts(chatId);
+              return;
+            }
+            await this.bot?.sendMessage(chatId, 'Qarzlar bo\'limi', { reply_markup: this.adminDebtsKeyboard() });
+            return;
+          }
+
+          if (idOrSource === 'alerts') {
+            await this.notifyAdminsImportantAlerts(true);
+            return;
+          }
+
+          if (idOrSource === 'health') {
+            await this.sendAdminHealth(chatId);
+            return;
+          }
+
+          if (idOrSource === 'search') {
+            await this.bot?.sendMessage(chatId, 'Qidirish uchun xabar yuboring:\n/qidir ism yoki telefon');
+            return;
+          }
+
+          if (idOrSource === 'settings') {
+            if (value === 'admins') {
+              const adminIds = await this.adminChatIds();
+              await this.bot?.sendMessage(
+                chatId,
+                [
+                  'Telegram adminlar',
+                  '',
+                  adminIds.length ? adminIds.join('\n') : 'Admin chat ID topilmadi.',
+                  '',
+                  'Qo\'shish: /admin_qosh 123456789',
+                  'Olib tashlash: /admin_ochir 123456789',
+                ].join('\n'),
+                { reply_markup: this.adminSettingsKeyboard() },
+              );
+              return;
+            }
+            await this.bot?.sendMessage(chatId, 'Sozlamalar bo\'limi', { reply_markup: this.adminSettingsKeyboard() });
+            return;
+          }
+        }
+
         if (type === 'status') {
           const order = await this.orderModel.findById(idOrSource).exec();
           if (!order) throw new Error('Order not found');
