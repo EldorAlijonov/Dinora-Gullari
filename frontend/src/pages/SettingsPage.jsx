@@ -1,4 +1,4 @@
-import { Archive, Camera, DatabaseBackup, Download, Image, Lock, Save, Store, UserRound } from 'lucide-react';
+import { Archive, Camera, DatabaseBackup, Download, Image, Lock, Plus, Save, Store, Trash2, UserRound } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useDispatch, useSelector } from 'react-redux';
@@ -21,6 +21,7 @@ const defaultSettings = {
   telegramDebtReminderEnabled: true,
   telegramDebtPaymentEnabled: true,
   telegramSaleCreatedEnabled: true,
+  telegramAdminIds: [],
   requirePhoneForDebtSales: true,
   debtReminderAfterDays: 3,
   preventSameDayDebtReminder: true,
@@ -131,6 +132,7 @@ export default function SettingsPage() {
   const { data: backupFiles = [] } = useBackupFilesQuery();
   const { data: deletedRecords = [] } = useDeletedRecordsQuery();
   const [settings, setSettings] = useState(defaultSettings);
+  const [telegramAdminInput, setTelegramAdminInput] = useState('');
   const [profile, setProfile] = useState({ fullName: '', email: '', phone: '', avatarUrl: '' });
   const [passwords, setPasswords] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
 
@@ -148,6 +150,26 @@ export default function SettingsPage() {
   }, [user]);
 
   const setSetting = (key, value) => setSettings((current) => ({ ...current, [key]: value }));
+
+  const addTelegramAdmin = () => {
+    const value = telegramAdminInput.trim();
+    if (!/^-?\d+$/.test(value)) {
+      toast.error('Telegram chat ID faqat raqamlardan iborat bo\'lsin');
+      return;
+    }
+    setSettings((current) => ({
+      ...current,
+      telegramAdminIds: [...new Set([...(current.telegramAdminIds || []), value])],
+    }));
+    setTelegramAdminInput('');
+  };
+
+  const removeTelegramAdmin = (chatId) => {
+    setSettings((current) => ({
+      ...current,
+      telegramAdminIds: (current.telegramAdminIds || []).filter((value) => value !== chatId),
+    }));
+  };
 
   const chooseImage = async (event, callback) => {
     const file = event.target.files?.[0];
@@ -305,6 +327,49 @@ export default function SettingsPage() {
             <Toggle label="Qarzdorlik eslatmalari" checked={settings.telegramDebtReminderEnabled} onChange={(value) => setSetting('telegramDebtReminderEnabled', value)} />
             <Toggle label="Qarz to‘lovi xabarlari" checked={settings.telegramDebtPaymentEnabled} onChange={(value) => setSetting('telegramDebtPaymentEnabled', value)} />
             <Toggle label="Sovg‘a/tovar xaridi xabari" checked={settings.telegramSaleCreatedEnabled} onChange={(value) => setSetting('telegramSaleCreatedEnabled', value)} />
+            <div className="rounded-lg border border-white/10 bg-slate-950/25 p-3">
+              <span className="block text-sm font-bold text-slate-100">Telegram adminlar</span>
+              <span className="mt-1 block text-xs leading-5 text-slate-500">
+                Chat ID qo'shing. Botda /adminlar, /admin_qosh va /admin_ochir komandalaridan ham foydalanish mumkin.
+              </span>
+              <div className="mt-3 flex gap-2">
+                <Input
+                  aria-label="Telegram admin chat ID"
+                  placeholder="123456789"
+                  value={telegramAdminInput}
+                  onChange={(event) => setTelegramAdminInput(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      addTelegramAdmin();
+                    }
+                  }}
+                />
+                <Button type="button" variant="secondary" onClick={addTelegramAdmin}>
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="mt-3 space-y-2">
+                {(settings.telegramAdminIds || []).length === 0 ? (
+                  <p className="text-xs text-slate-500">Qo'shimcha admin chat ID yo'q.</p>
+                ) : (
+                  settings.telegramAdminIds.map((chatId) => (
+                    <div key={chatId} className="flex items-center justify-between gap-2 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200">
+                      <span>{chatId}</span>
+                      <button
+                        type="button"
+                        className="grid h-8 w-8 place-items-center rounded-md text-slate-400 transition hover:bg-rose-500/10 hover:text-rose-300"
+                        onClick={() => removeTelegramAdmin(chatId)}
+                        title="Adminni olib tashlash"
+                        aria-label="Adminni olib tashlash"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
             <Toggle label="Nasiya savdoda telefon majburiy" description="Telefon bo‘lmasa qarz eslatmasi yuborib bo‘lmaydi." checked={settings.requirePhoneForDebtSales} onChange={(value) => setSetting('requirePhoneForDebtSales', value)} />
             <Toggle label="Bir kunda qayta eslatmaslik" checked={settings.preventSameDayDebtReminder} onChange={(value) => setSetting('preventSameDayDebtReminder', value)} />
           </div>

@@ -38,6 +38,9 @@ export class AppSettings {
   @Prop({ type: Boolean, default: true })
   telegramSaleCreatedEnabled: boolean;
 
+  @Prop({ type: [String], default: [] })
+  telegramAdminIds: string[];
+
   @Prop({ type: Boolean, default: true })
   requirePhoneForDebtSales: boolean;
 

@@ -324,7 +324,7 @@ export class TelegramService implements OnModuleInit {
     }
   }
 
-  private adminChatIds() {
+  private envAdminChatIds() {
     const fromEnv = this.config.get<string>('TELEGRAM_ADMIN_IDS');
     return (fromEnv || '6874906701,1779520880')
       .split(',')
@@ -332,14 +332,19 @@ export class TelegramService implements OnModuleInit {
       .filter(Boolean);
   }
 
-  private isAdminChat(chatId?: number | string) {
-    return chatId !== undefined && this.adminChatIds().includes(String(chatId));
+  private async adminChatIds() {
+    return [...new Set([...this.envAdminChatIds(), ...(await this.settingsService.getTelegramAdminIds())])];
+  }
+
+  private async isAdminChat(chatId?: number | string) {
+    return chatId !== undefined && (await this.adminChatIds()).includes(String(chatId));
   }
 
   private async sendToAdmins(message: string, replyMarkup?: TelegramBot.SendMessageOptions['reply_markup']) {
     if (!this.bot) return;
+    const adminIds = await this.adminChatIds();
     await Promise.all(
-      this.adminChatIds().map((chatId) =>
+      adminIds.map((chatId) =>
         this.bot
           ?.sendMessage(chatId, message, replyMarkup ? { reply_markup: replyMarkup } : undefined)
           .catch(() => undefined),
@@ -369,7 +374,7 @@ export class TelegramService implements OnModuleInit {
   }
 
   private async assertAdmin(msg: TelegramBot.Message) {
-    if (this.isAdminChat(msg.chat.id)) return true;
+    if (await this.isAdminChat(msg.chat.id)) return true;
     await this.bot?.sendMessage(msg.chat.id, 'Bu buyruq faqat admin uchun.');
     return false;
   }
@@ -520,6 +525,9 @@ export class TelegramService implements OnModuleInit {
         '/qidir matn - buyurtma/sotuv/qarzdor qidirish',
         '/ogohlantirishlar - muhim ogohlantirishlar',
         '/holat - bot/backend holati',
+        '/adminlar - admin chat ID lar',
+        '/admin_qosh chat_id - admin qo\'shish',
+        '/admin_ochir chat_id - adminni olib tashlash',
       ].join('\n'),
       {
         reply_markup: {
@@ -570,9 +578,41 @@ export class TelegramService implements OnModuleInit {
       if (await this.assertAdmin(msg)) await this.sendAdminHealth(msg.chat.id);
     });
 
+    this.bot.onText(/^\/adminlar$/, async (msg) => {
+      if (!(await this.assertAdmin(msg))) return;
+      const adminIds = await this.adminChatIds();
+      await this.bot?.sendMessage(msg.chat.id, adminIds.length ? `Admin chat ID lar:\n${adminIds.join('\n')}` : 'Admin chat ID topilmadi.');
+    });
+
+    this.bot.onText(/^\/admin_qosh(?:\s+(-?\d+))?$/, async (msg, match) => {
+      if (!(await this.assertAdmin(msg))) return;
+      const chatId = match?.[1];
+      if (!chatId) {
+        await this.bot?.sendMessage(msg.chat.id, 'Foydalanish: /admin_qosh 123456789');
+        return;
+      }
+      await this.settingsService.addTelegramAdminId(chatId);
+      await this.bot?.sendMessage(msg.chat.id, `Admin qo'shildi: ${chatId}`);
+    });
+
+    this.bot.onText(/^\/admin_ochir(?:\s+(-?\d+))?$/, async (msg, match) => {
+      if (!(await this.assertAdmin(msg))) return;
+      const chatId = match?.[1];
+      if (!chatId) {
+        await this.bot?.sendMessage(msg.chat.id, 'Foydalanish: /admin_ochir 123456789');
+        return;
+      }
+      if (this.envAdminChatIds().includes(chatId)) {
+        await this.bot?.sendMessage(msg.chat.id, 'Bu admin .env orqali berilgan, uni Settingsdan o\'chirib bo\'lmaydi.');
+        return;
+      }
+      await this.settingsService.removeTelegramAdminId(chatId);
+      await this.bot?.sendMessage(msg.chat.id, `Admin olib tashlandi: ${chatId}`);
+    });
+
     this.bot.on('callback_query', async (query) => {
       const chatId = query.message?.chat.id;
-      if (!chatId || !this.isAdminChat(chatId) || !query.data) {
+      if (!chatId || !(await this.isAdminChat(chatId)) || !query.data) {
         await this.bot?.answerCallbackQuery(query.id, { text: 'Ruxsat yo‘q' });
         return;
       }
@@ -654,7 +694,7 @@ export class TelegramService implements OnModuleInit {
     });
 
     this.bot.onText(/\/start/, async (msg) => {
-      if (this.isAdminChat(msg.chat.id)) {
+      if (await this.isAdminChat(msg.chat.id)) {
         await this.sendAdminMenu(msg.chat.id);
         return;
       }

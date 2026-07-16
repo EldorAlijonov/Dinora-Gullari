@@ -82,7 +82,7 @@ export default function LoginPage() {
           </div>
           <div className="mt-8 flex items-center gap-2 rounded-lg bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">
             <Phone className="h-4 w-4" />
-            Demo admin uchun README dagi seed buyrug‘idan foydalaning.
+            Kirish ma'lumotlari administrator tomonidan beriladi.
           </div>
         </form>
       </motion.div>

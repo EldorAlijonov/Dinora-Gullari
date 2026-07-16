@@ -30,6 +30,7 @@ export class SettingsService {
       telegramDebtReminderEnabled: body.telegramDebtReminderEnabled,
       telegramDebtPaymentEnabled: body.telegramDebtPaymentEnabled,
       telegramSaleCreatedEnabled: body.telegramSaleCreatedEnabled,
+      telegramAdminIds: Array.isArray(body.telegramAdminIds) ? this.cleanTelegramAdminIds(body.telegramAdminIds) : undefined,
       requirePhoneForDebtSales: body.requirePhoneForDebtSales,
       debtReminderAfterDays: body.debtReminderAfterDays,
       preventSameDayDebtReminder: body.preventSameDayDebtReminder,
@@ -52,5 +53,28 @@ export class SettingsService {
   async getStoreName() {
     const settings = await this.getSettings();
     return settings?.storeName || 'Dinora Gullari';
+  }
+
+  async getTelegramAdminIds() {
+    const settings = await this.getSettings();
+    return this.cleanTelegramAdminIds(settings?.telegramAdminIds || []);
+  }
+
+  async addTelegramAdminId(chatId: string) {
+    const cleaned = this.cleanTelegramAdminIds([chatId])[0];
+    if (!cleaned) return this.getSettings();
+    return this.settingsModel
+      .findOneAndUpdate({ key: SETTINGS_KEY }, { $setOnInsert: { key: SETTINGS_KEY }, $addToSet: { telegramAdminIds: cleaned } }, { upsert: true, new: true })
+      .exec();
+  }
+
+  async removeTelegramAdminId(chatId: string) {
+    const cleaned = this.cleanTelegramAdminIds([chatId])[0];
+    if (!cleaned) return this.getSettings();
+    return this.settingsModel.findOneAndUpdate({ key: SETTINGS_KEY }, { $pull: { telegramAdminIds: cleaned } }, { upsert: true, new: true }).exec();
+  }
+
+  private cleanTelegramAdminIds(values: string[]) {
+    return [...new Set(values.map((value) => String(value || '').trim()).filter((value) => /^-?\d+$/.test(value)))];
   }
 }
