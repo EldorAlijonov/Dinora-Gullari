@@ -515,19 +515,12 @@ export class TelegramService implements OnModuleInit {
   private adminMainKeyboard() {
     return {
       inline_keyboard: [
-        [
-          { text: 'Hisobot', callback_data: 'admin:report' },
-          { text: 'Buyurtmalar', callback_data: 'admin:orders' },
-        ],
-        [
-          { text: 'Qarzlar', callback_data: 'admin:debts' },
-          { text: 'Ogohlantirishlar', callback_data: 'admin:alerts' },
-        ],
+        [{ text: 'Buyurtmalar', callback_data: 'admin:orders' }],
+        [{ text: 'Qarzlar', callback_data: 'admin:debts' }],
         [
           { text: 'Qidirish', callback_data: 'admin:search' },
           { text: 'Sozlamalar', callback_data: 'admin:settings' },
         ],
-        [{ text: 'Texnik holat', callback_data: 'admin:health' }],
       ],
     };
   }
@@ -553,10 +546,7 @@ export class TelegramService implements OnModuleInit {
   private adminSettingsKeyboard() {
     return {
       inline_keyboard: [
-        [
-          { text: 'Adminlar', callback_data: 'admin:settings:admins' },
-          { text: 'Bot holati', callback_data: 'admin:health' },
-        ],
+        [{ text: 'Adminlar', callback_data: 'admin:settings:admins' }],
         [{ text: 'Orqaga', callback_data: 'admin:menu' }],
       ],
     };
@@ -565,9 +555,9 @@ export class TelegramService implements OnModuleInit {
   private adminReplyKeyboard() {
     return {
       keyboard: [
-        [{ text: '/admin' }, { text: '/hisobot' }],
-        [{ text: '/bugun' }, { text: '/qarzlar' }],
-        [{ text: '/kechikkan' }, { text: '/holat' }],
+        [{ text: 'Bosh menyu' }, { text: 'Hisobot' }],
+        [{ text: 'Bugungi buyurtmalar' }, { text: 'Qarzlar' }],
+        [{ text: 'Kechikkanlar' }, { text: 'Texnik holat' }],
       ],
       resize_keyboard: true,
     };
@@ -606,10 +596,10 @@ export class TelegramService implements OnModuleInit {
   private async sendAdminMenu(chatId: number) {
     await this.bot?.sendMessage(
       chatId,
-      ['Admin panel', '', 'Kerakli bo\'limni tanlang. Ichki tugmalar navigatsiya uchun, pastdagi panel esa tezkor komandalar uchun.'].join('\n'),
+      ['Admin panel', '', 'Pastdagi tugmalar tezkor amallar uchun. Ichki bo\'limlarga kirish uchun navigatsiya tugmalaridan foydalaning.'].join('\n'),
       { reply_markup: this.adminMainKeyboard() },
     );
-    await this.bot?.sendMessage(chatId, 'Tezkor panel', { reply_markup: this.adminReplyKeyboard() });
+    await this.bot?.sendMessage(chatId, 'Tezkor panel yangilandi.', { reply_markup: this.adminReplyKeyboard() });
   }
 
   private registerHandlers() {
@@ -619,7 +609,16 @@ export class TelegramService implements OnModuleInit {
       await this.sendAdminMenu(msg.chat.id);
     });
 
+    this.bot.onText(/^Bosh menyu$/i, async (msg) => {
+      if (!(await this.assertAdmin(msg))) return;
+      await this.sendAdminMenu(msg.chat.id);
+    });
+
     this.bot.onText(/^\/hisobot$/, async (msg) => {
+      if (await this.assertAdmin(msg)) await this.sendAdminReport(msg.chat.id);
+    });
+
+    this.bot.onText(/^Hisobot$/i, async (msg) => {
       if (await this.assertAdmin(msg)) await this.sendAdminReport(msg.chat.id);
     });
 
@@ -627,11 +626,23 @@ export class TelegramService implements OnModuleInit {
       if (await this.assertAdmin(msg)) await this.sendAdminDebts(msg.chat.id);
     });
 
+    this.bot.onText(/^Qarzlar$/i, async (msg) => {
+      if (await this.assertAdmin(msg)) await this.sendAdminDebts(msg.chat.id);
+    });
+
     this.bot.onText(/^\/bugun$/, async (msg) => {
       if (await this.assertAdmin(msg)) await this.sendAdminOrders(msg.chat.id, 'today');
     });
 
+    this.bot.onText(/^Bugungi buyurtmalar$/i, async (msg) => {
+      if (await this.assertAdmin(msg)) await this.sendAdminOrders(msg.chat.id, 'today');
+    });
+
     this.bot.onText(/^\/kechikkan$/, async (msg) => {
+      if (await this.assertAdmin(msg)) await this.sendAdminOrders(msg.chat.id, 'overdue');
+    });
+
+    this.bot.onText(/^Kechikkanlar$/i, async (msg) => {
       if (await this.assertAdmin(msg)) await this.sendAdminOrders(msg.chat.id, 'overdue');
     });
 
@@ -645,6 +656,10 @@ export class TelegramService implements OnModuleInit {
     });
 
     this.bot.onText(/^\/holat$/, async (msg) => {
+      if (await this.assertAdmin(msg)) await this.sendAdminHealth(msg.chat.id);
+    });
+
+    this.bot.onText(/^Texnik holat$/i, async (msg) => {
       if (await this.assertAdmin(msg)) await this.sendAdminHealth(msg.chat.id);
     });
 
